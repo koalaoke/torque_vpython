@@ -1,4 +1,4 @@
-# 
+# Torque em uma espira
 Simulando o torque de uma espira com vpython
 
 # Executando o projeto
