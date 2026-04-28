@@ -33,6 +33,14 @@ seta_forca_dir = arrow(color=color.orange, shaftwidth=0.15)
 seta_forca_esq = arrow(color=color.orange, shaftwidth=0.15)
 
 
+usar_comutador = False
+
+
+def toggle_comutador(evt):
+    global usar_comutador
+    usar_comutador = evt.checked
+
+
 def mudar_campo(evt):
     field_t.text = f" {field.value:1.2f} T"
     ring.field = vec(field.value, 0, 0)
@@ -90,12 +98,12 @@ scene.append_to_caption(" <i>(Só funciona com a simulação pausada)</i>")
 scene.append_to_caption("\n\n<b>Variáveis Físicas:</b>\n")
 
 scene.append_to_caption("Campo Magnético (B): ")
-field = slider(bind=mudar_campo, min=-1, max=1, value=0, id="f")
+field = slider(bind=mudar_campo, min=-1, max=1, step=0.05, value=0, id="f")
 field_t = wtext(text=f" {field.value:1.2f} T")
 scene.append_to_caption("\n\n")
 
 scene.append_to_caption("Corrente (i): ")
-current = slider(bind=mudar_espira, min=-10, max=10, value=0, id="current")
+current = slider(bind=mudar_espira, min=-10, max=10, step=0.1, value=0, id="current")
 current_t = wtext(text=f" {current.value:1.2f} A")
 
 scene.append_to_caption(" | Nº de Espiras (N): ")
@@ -118,6 +126,10 @@ massa_rectangle = slider(bind=mudar_espira, min=1, max=100, value=10, id="mass")
 massa_t = wtext(text=f" {massa_rectangle.value:1.2f} g")
 scene.append_to_caption("\n\n")
 
+checkbox(
+    bind=toggle_comutador, text="<b>Inverter corrente a cada meia-volta (Comutador)</b>"
+)
+
 btn_pause = button(text="Começar", pos=scene.title_anchor, bind=toggle_pause)
 
 texto_forca = label(
@@ -132,6 +144,7 @@ texto_mu = label(
 
 # --- LOOP ---
 while True:
+    y_anterior = ring.up.y
     if running:
         rate(1 / dt)
 
@@ -159,15 +172,26 @@ while True:
 
     tau_vec = cross(ring.mm_dipolar, ring.field)
 
-    L_vec = vec(0, 0, height_rectangle.value)
-    F_vec = cross(ring.n_espiras * ring.current * L_vec, ring.field) * 0.1
+    L_vec = vec(0, 0, width_rectangle.value)
+    F_vec = cross(ring.n_espiras * ring.current * L_vec, ring.field) * 10e-2
     dir_lateral = cross(ring.up, vec(0, 0, 1)).hat
 
-    seta_forca_dir.pos = dir_lateral * (width_rectangle.value / 2)
+    seta_forca_dir.pos = dir_lateral * (height_rectangle.value / 2)
     seta_forca_dir.axis = -F_vec
-    seta_forca_esq.pos = -dir_lateral * (width_rectangle.value / 2)
+    seta_forca_esq.pos = -dir_lateral * (height_rectangle.value / 2)
     seta_forca_esq.axis = F_vec
 
     texto_forca.text = f"Módulo da Força (|F|): {mag(F_vec):.2f} N"
     texto_torque.text = f"Módulo do Torque (|Tau|): {mag(tau_vec):.2f} N.m"
     texto_mu.text = f"|µ|: {mag(ring.mm_dipolar):.2f} A.m²"
+
+    if usar_comutador:
+        cruzou_descendo = y_anterior > 0 and ring.up.y <= 0
+        cruzou_subindo = y_anterior < 0 and ring.up.y >= 0
+
+        if cruzou_descendo or cruzou_subindo:
+            current.value = -current.value
+            ring.current = current.value
+            current_t.text = f" {current.value:1.2f} A"
+
+    ring.mm_dipolar = ring.n_espiras * ring.up * ring.area * ring.current
